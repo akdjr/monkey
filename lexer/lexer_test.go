@@ -90,7 +90,7 @@ func TestNextToken(t *testing.T) {
 		{
 			input: `!-/*5;
 			5 < 10 > 5;
-			`,
+			=`,
 			expectedTokens: []expectedTokenType{
 				{token.BANG, "!"},
 				{token.MINUS, "-"},
@@ -105,6 +105,7 @@ func TestNextToken(t *testing.T) {
 				{token.GT, ">"},
 				{token.INT, "5"},
 				{token.SEMICOLON, ";"},
+				{token.ASSIGN, "="},
 				{token.EOF, ""},
 			},
 		},
@@ -155,6 +156,24 @@ func TestNextToken(t *testing.T) {
 				{token.INT, "9"},
 				{token.SEMICOLON, ";"},
 
+				{token.EOF, ""},
+			},
+		},
+		{
+			input: `?%$#@^\|~'"
+			`,
+			expectedTokens: []expectedTokenType{
+				{token.ILLEGAL, "?"},
+				{token.ILLEGAL, "%"},
+				{token.ILLEGAL, "$"},
+				{token.ILLEGAL, "#"},
+				{token.ILLEGAL, "@"},
+				{token.ILLEGAL, "^"},
+				{token.ILLEGAL, "\\"},
+				{token.ILLEGAL, "|"},
+				{token.ILLEGAL, "~"},
+				{token.ILLEGAL, "'"},
+				{token.ILLEGAL, "\""},
 				{token.EOF, ""},
 			},
 		},
