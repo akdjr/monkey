@@ -36,7 +36,7 @@ func TestNextToken(t *testing.T) {
 			let ten = 10;
 			
 			let add = fn(x, y) {
-				x + y;
+				return x + y;
 			};
 			
 			let result = add(five, ten);
@@ -65,6 +65,7 @@ func TestNextToken(t *testing.T) {
 				{token.RPAREN, ")"},
 				{token.LBRACE, "{"},
 
+				{token.RETURN, "return"},
 				{token.IDENTIFIER, "x"},
 				{token.PLUS, "+"},
 				{token.IDENTIFIER, "y"},
