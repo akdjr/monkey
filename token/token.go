@@ -6,7 +6,7 @@ type TokenType string
 
 // Token represents a single token in the source
 // Type is the type of token
-// Literal is the literal value of the token (such as the name of the identifier or the value of a literal)
+// Literal is the literal value of the token (such as the name of the identifier or the value of a literal).  It is the sequence of characters directly taken from the input
 // TODO: Add some more information, such as line number, column number for enhanced error reporting
 type Token struct {
 	Type    TokenType
