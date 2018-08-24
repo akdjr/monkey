@@ -71,6 +71,11 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.INT, p.parseIntegerLiteral)
 	p.registerPrefix(token.BANG, p.parsePrefixExpression)
 	p.registerPrefix(token.MINUS, p.parsePrefixExpression)
+	p.registerPrefix(token.TRUE, p.parseBoolean)
+	p.registerPrefix(token.FALSE, p.parseBoolean)
+	p.registerPrefix(token.LPAREN, p.parseGroupedExpression)
+	p.registerPrefix(token.IF, p.parseIfExpression)
+	p.registerPrefix(token.FUNCTION, p.parseFunctionLiteral)
 
 	p.registerInfix(token.PLUS, p.parseInfixExpression)
 	p.registerInfix(token.MINUS, p.parseInfixExpression)
@@ -205,6 +210,7 @@ func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 
 	stmt.Expression = p.parseExpression(LOWEST)
 
+	// if the next token is semicolon, set it to currentS
 	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
 	}
@@ -308,6 +314,152 @@ func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 	return expression
 }
 
+// parse a boolean literal.  true/false
+func (p *Parser) parseBoolean() ast.Expression {
+	return &ast.Boolean{
+		Token: p.currentToken,
+		Value: p.currentTokenIs(token.TRUE),
+	}
+}
+
+// parse a grouped expression - (<expression>)
+func (p *Parser) parseGroupedExpression() ast.Expression {
+	// currentToken is '('
+	// advance the token to get the beginning of the grouped expression and parse as normal with LOWEST precedence as if we are starting from the beginning
+	p.nextToken()
+
+	// start from lowest precedence as if this was a fresh expression
+	exp := p.parseExpression(LOWEST)
+
+	// after the expression is fully parsed, expect to find ')' as the next token
+	// if not, we have an error (missing a closing ')')
+	// expectPeek will advance the tokens if we encounter the correct token
+	if !p.expectPeek(token.RPAREN) {
+		return nil
+	}
+
+	return exp
+}
+
+// parse an if expression - if (<condition) { <consequence> }
+func (p *Parser) parseIfExpression() ast.Expression {
+	expression := &ast.IfExpression{
+		Token: p.currentToken,
+	}
+
+	// next token needs to be a '(' to begin condition expression
+	if !p.expectPeek(token.LPAREN) {
+		return nil
+	}
+
+	// currentToken is '(', advance to get condition expression
+	p.nextToken()
+
+	// parse the condition expression
+	expression.Condition = p.parseExpression(LOWEST)
+
+	// next token needs to be a ')' to end the condition expression
+	if !p.expectPeek(token.RPAREN) {
+		return nil
+	}
+
+	// currentToken is ')'
+	// next token needs to be a '{' to begin the consequence block
+	if !p.expectPeek(token.LBRACE) {
+		return nil
+	}
+
+	expression.Consequence = p.parseBlockStatement()
+
+	// check if the next token is an else as we are currently at the '}' of the consequence block statement
+	if p.peekTokenIs(token.ELSE) {
+		// an else clause is present of the form else { <alternative }
+		// advance to the else token
+		p.nextToken()
+
+		// check that the next token is '{' for the alternative block
+		if !p.expectPeek(token.LBRACE) {
+			return nil
+		}
+
+		expression.Alternative = p.parseBlockStatement()
+	}
+
+	return expression
+}
+
+// parse a BlockStatement of form { <statements> }
+func (p *Parser) parseBlockStatement() *ast.BlockStatement {
+	// currentToken is an opening brace, parse statements until we hit a '}'
+	block := &ast.BlockStatement{
+		Token: p.currentToken,
+	}
+	block.Statements = []ast.Statement{}
+
+	// advance past the '{'
+	p.nextToken()
+
+	// iterate through statements until we hit a '}' or end of file
+	for !p.currentTokenIs(token.RBRACE) && !p.currentTokenIs(token.EOF) {
+		stmt := p.parseStatement()
+		if stmt != nil {
+			block.Statements = append(block.Statements, stmt)
+		}
+
+		// parseStatement advances until we hit a semicolon
+		p.nextToken()
+	}
+
+	return block
+}
+
+// parse a function literal expression of form fn(<identifier params>) { <blockstatement> }
+func (p *Parser) parseFunctionLiteral() ast.Expression {
+	function := &ast.FunctionLiteral{
+		Token: p.currentToken,
+	}
+
+	// next token must be a '('
+	if !p.expectPeek(token.LPAREN) {
+		return nil
+	}
+
+	// parse all prameters till the closing ')'
+	function.Parameters = p.parseFunctionParameters()
+
+	// next token must be the '{' to start the function body
+	if !p.expectPeek(token.LBRACE) {
+		return nil
+	}
+
+	function.Body = p.parseBlockStatement()
+
+	return function
+}
+
+func (p *Parser) parseFunctionParameters() []*ast.Identifier {
+	// empty set of parameters
+	identifiers := []*ast.Identifier{}
+
+	if p.peekTokenIs(token.RPAREN) {
+		// next token is closing paren, empty parameter list
+		return identifiers
+	}
+
+	// currentToken is now '('
+	// check for closing ')' - signifies empty parameter list
+	// if it is not the closing paren, then start parsing identifiers and skipping commas
+	if !p.currentTokenIs(token.RPAREN) {
+		// iterate through identifier/comma token pairs
+		for !p.currentTokenIs(token.RPAREN) && !p.currentTokenIs(token.EOF) {
+			ident := p.parseIdentifier()
+			if ident != nil {
+				function.Parameters = append(function.Parameters, ident)
+			}
+		}
+	}
+}
+
 // check if current token is token type
 func (p *Parser) currentTokenIs(t token.TokenType) bool {
 	return p.currentToken.Type == t
@@ -318,7 +470,7 @@ func (p *Parser) peekTokenIs(t token.TokenType) bool {
 	return p.peekToken.Type == t
 }
 
-// look at the peekToken.  if it is of the right type, get the next token
+// look at the peekToken.  if it is of the right type, advance the tokens and get the next token
 func (p *Parser) expectPeek(t token.TokenType) bool {
 	if p.peekTokenIs(t) {
 		p.nextToken()
