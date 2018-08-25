@@ -3,9 +3,7 @@ package repl
 import (
 	"akdjr/monkey/lexer"
 	"akdjr/monkey/parser"
-	"akdjr/monkey/token"
 	"bufio"
-	"fmt"
 	"io"
 )
 
@@ -17,7 +15,7 @@ func Start(in io.Reader, out io.Writer) {
 	scanner := bufio.NewScanner(in)
 
 	for {
-		fmt.Printf(PROMPT)
+		io.WriteString(out, PROMPT)
 		scanned := scanner.Scan()
 
 		if !scanned {
@@ -31,17 +29,13 @@ func Start(in io.Reader, out io.Writer) {
 		errors := p.Errors()
 
 		if len(errors) > 0 {
-			for _, error := range errors {
-				fmt.Println(error)
+			for _, msg := range errors {
+				io.WriteString(out, "\t"+msg+"\n")
 			}
+			continue
 		} else {
-			for _, stmt := range program.Statements {
-				fmt.Println(stmt.String())
-			}
-		}
-
-		for tok := l.NextToken(); tok.Type != token.EOF; tok = l.NextToken() {
-			fmt.Printf("%+v\n", tok)
+			io.WriteString(out, program.String())
+			io.WriteString(out, "\n")
 		}
 	}
 }

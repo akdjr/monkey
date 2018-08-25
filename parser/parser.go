@@ -38,6 +38,7 @@ var precedences = map[token.TokenType]int{
 	token.MINUS:    SUM,
 	token.SLASH:    PRODUCT,
 	token.ASTERISK: PRODUCT,
+	token.LPAREN:   CALL,
 }
 
 // Parser represents an instance of a parser.  It takes a lexer and creates an AST, a tree of statements and expressions that represents the grammar of the language
@@ -85,6 +86,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfix(token.NOT_EQ, p.parseInfixExpression)
 	p.registerInfix(token.LT, p.parseInfixExpression)
 	p.registerInfix(token.GT, p.parseInfixExpression)
+	p.registerInfix(token.LPAREN, p.parseCallExpression)
 
 	return p
 }
@@ -179,8 +181,12 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 		return nil
 	}
 
-	// TODO: skip expressions until we encounter a semicolon
-	for !p.currentTokenIs(token.SEMICOLON) {
+	// currentToken is =, advance forward and parse the expression
+	p.nextToken()
+	stmt.Value = p.parseExpression(LOWEST)
+
+	// if next token is semicolon, advance forward
+	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
 	}
 
@@ -193,10 +199,12 @@ func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 		Token: p.currentToken,
 	}
 
+	// current token is return, advance forward to expression
 	p.nextToken()
+	stmt.ReturnValue = p.parseExpression(LOWEST)
 
-	// TODO: skip expressions until we encounter a semicolon
-	for !p.currentTokenIs(token.SEMICOLON) {
+	// if next token is semicolon, advance to it
+	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
 	}
 
@@ -443,21 +451,83 @@ func (p *Parser) parseFunctionParameters() []*ast.Identifier {
 
 	if p.peekTokenIs(token.RPAREN) {
 		// next token is closing paren, empty parameter list
+		p.nextToken()
 		return identifiers
 	}
 
-	// currentToken is now '('
-	// check for closing ')' - signifies empty parameter list
-	// if it is not the closing paren, then start parsing identifiers and skipping commas
-	if !p.currentTokenIs(token.RPAREN) {
-		// iterate through identifier/comma token pairs
-		for !p.currentTokenIs(token.RPAREN) && !p.currentTokenIs(token.EOF) {
-			ident := p.parseIdentifier()
-			if ident != nil {
-				function.Parameters = append(function.Parameters, ident)
-			}
-		}
+	// currentToken is now '(' and the next token needs to be an identifier
+	p.nextToken()
+
+	ident := &ast.Identifier{
+		Token: p.currentToken,
+		Value: p.currentToken.Literal,
 	}
+
+	identifiers = append(identifiers, ident)
+
+	// if the next token is a comma, iterate through all ident/comma token pairs
+	for p.peekTokenIs(token.COMMA) {
+		// advance to comma, then advance to token after comma
+		p.nextToken()
+		p.nextToken()
+
+		ident := &ast.Identifier{
+			Token: p.currentToken,
+			Value: p.currentToken.Literal,
+		}
+		identifiers = append(identifiers, ident)
+	}
+
+	// expect next token to be an RPAREN and advance to it
+	if !p.expectPeek(token.RPAREN) {
+		return nil
+	}
+
+	return identifiers
+}
+
+// parse a call expression.  a call expression is essential an infix expression with the '(' as an operator.  ex. add(5) - left = identifier (add or fn for function literal), operator = '(', right = expression arguments
+func (p *Parser) parseCallExpression(function ast.Expression) ast.Expression {
+	exp := &ast.CallExpression{
+		Token:    p.currentToken,
+		Function: function,
+	}
+	exp.Arguments = p.parseCallArguments()
+
+	return exp
+}
+
+// parse call arguments.
+func (p *Parser) parseCallArguments() []ast.Expression {
+	args := []ast.Expression{}
+
+	// currenttoken is '('
+	if p.peekTokenIs(token.RPAREN) {
+		// next token is ), advance past it and return empty args
+		p.nextToken()
+		return args
+	}
+
+	// advance to first expression token and parse it
+	p.nextToken()
+	args = append(args, p.parseExpression(LOWEST))
+
+	// as long as the next token is a comma, keep parsing expressions
+	for p.peekTokenIs(token.COMMA) {
+		// advance to comma
+		p.nextToken()
+		// advance to expression
+		p.nextToken()
+
+		args = append(args, p.parseExpression(LOWEST))
+	}
+
+	// at this point, 1 or more args, require closing paren
+	if !p.expectPeek(token.RPAREN) {
+		return nil
+	}
+
+	return args
 }
 
 // check if current token is token type
