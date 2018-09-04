@@ -1,6 +1,7 @@
 package repl
 
 import (
+	"akdjr/monkey/evaluator"
 	"akdjr/monkey/lexer"
 	"akdjr/monkey/parser"
 	"bufio"
@@ -34,7 +35,9 @@ func Start(in io.Reader, out io.Writer) {
 			}
 			continue
 		} else {
-			io.WriteString(out, program.String())
+			// io.WriteString(out, program.String())
+			result := evaluator.Eval(program)
+			io.WriteString(out, result.Inspect())
 			io.WriteString(out, "\n")
 		}
 	}
