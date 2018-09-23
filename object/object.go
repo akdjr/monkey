@@ -13,6 +13,7 @@ const (
 	BOOLEAN_OBJ      = "BOOLEAN"
 	NULL_OBJ         = "NULL"
 	RETURN_VALUE_OBJ = "RETURN_VALUE"
+	ERROR_OBJ        = "ERROR"
 )
 
 // Object is an internal representation of a value.  Every value will be wrapped in a struct that fulfills this interface
@@ -51,3 +52,12 @@ type ReturnValue struct {
 
 func (rv *ReturnValue) Inspect() string  { return rv.Value.Inspect() }
 func (rv *ReturnValue) Type() ObjectType { return RETURN_VALUE_OBJ }
+
+// Error represents an internal error.  These are any internal or user errors that spawn as a result of invalid operators, unsupported operations, or anything else.
+// TODO: add stack trace, line/column numbers (LEXER support required), etc.
+type Error struct {
+	Message string
+}
+
+func (e *Error) Inspect() string  { return "ERROR: " + e.Message }
+func (e *Error) Type() ObjectType { return ERROR_OBJ }
