@@ -3,6 +3,7 @@ package repl
 import (
 	"akdjr/monkey/evaluator"
 	"akdjr/monkey/lexer"
+	"akdjr/monkey/object"
 	"akdjr/monkey/parser"
 	"bufio"
 	"io"
@@ -14,6 +15,7 @@ const PROMPT = ">>"
 // Start reads tokens until it hits EOF
 func Start(in io.Reader, out io.Writer) {
 	scanner := bufio.NewScanner(in)
+	env := object.NewEnvironment()
 
 	for {
 		io.WriteString(out, PROMPT)
@@ -36,8 +38,12 @@ func Start(in io.Reader, out io.Writer) {
 			continue
 		} else {
 			// io.WriteString(out, program.String())
-			result := evaluator.Eval(program)
-			io.WriteString(out, result.Inspect())
+			result := evaluator.Eval(program, env)
+			if result != nil {
+				io.WriteString(out, result.Inspect())
+			} else {
+				io.WriteString(out, "nil")
+			}
 			io.WriteString(out, "\n")
 		}
 	}
